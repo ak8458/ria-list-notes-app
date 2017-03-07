@@ -47,3 +47,11 @@ footer {
         padding: 15px 0;
     }
 }
+
+.help-inline{
+    color: red;
+}
+
+.label{
+    font-size: 100%;
+}
