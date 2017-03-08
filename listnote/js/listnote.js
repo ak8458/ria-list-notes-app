@@ -1,19 +1,9 @@
 (function($){
 	var EMPTY_STRING = '';
 
-
-	function isFieldNotEmpty(value, alertElement){
-		if(value===EMPTY_STRING || value===null){
-			alert(alertElement.getAttribute("data-label") +" is Empty");
-			return false;
-		}
-		return true;
-	}
-
-	//console.log('js loaded....');
 	var db;
 
-	var openRequest = indexedDB.open("listnotedb",1);
+	var openRequest = window.indexedDB.open("listnotedb",1);
 	openRequest.onupgradeneeded = function(e) {
 		var thisDB = e.target.result;
 		if(!thisDB.objectStoreNames.contains("Notes")) {
@@ -23,8 +13,8 @@
 
 	openRequest.onsuccess = function(e) {
 		db = e.target.result;
-		document.getElementById('createNote').addEventListener('click', createNote);
-        renderList();
+		$( "#inputForm" ).submit(createNote);
+		renderList();
 	}
 
 	openRequest.onerror = function(e) {
@@ -35,35 +25,25 @@
 	function createNote() {
 		var transaction = db.transaction(["Notes"],"readwrite");
 		var store = transaction.objectStore("Notes");
-		
-		var createAuthNameElement=document.getElementById("createAuthname");
-    	var createSubjectElement=document.getElementById("createSubject");
-    	var createMessageElement=document.getElementById("createMessage");
 
-		var createAuthname=createAuthNameElement.value.trim();
-    	var createSubject=createSubjectElement.value.trim();
-    	var createMessage=createMessageElement.value.trim();
-		if(isFieldNotEmpty(createAuthname, createAuthNameElement) && isFieldNotEmpty(createSubject, createSubjectElement) && isFieldNotEmpty(createMessage, createMessageElement)){
-			creationTime =new Date();
-			var request = store.add({authorName: createAuthname, subject: createSubject, message:createMessage, creationTime:creationTime, updateTime:creationTime});
-			request.onerror = function(e) {
-				console.log("Error",e.target.error.name);
-		        //some type of error handler
-		    }
-		    request.onsuccess = function(e) {
-		    	createAuthNameElement.innerHTML = EMPTY_STRING;
-		    	createSubjectElement.innerHTML = EMPTY_STRING;
-		    	createMessageElement.innerHTML = EMPTY_STRING;
-		    	$('#inputFormModal').modal('hide');
-		    	renderList();
-		    }
-
-		}
+		var createAuthname=document.getElementById("createAuthname").value.trim();
+		var createSubject=document.getElementById("createSubject").value.trim();
+		var createMessage=document.getElementById("createMessage").value.trim();
+		creationTime =new Date();
+		var request = store.add({authorName: createAuthname, subject: createSubject, message:createMessage, creationTime:creationTime, updateTime:creationTime});
+		request.onerror = function(e) {
+			console.log("Error",e.target.error.name);
+				//some type of error handler
+			}
+			request.onsuccess = function(e) {
+				$('#inputFormModal').modal('hide');
+				renderList();
+				$( "#inputForm" )[0].reset();
+			}
 	}
 
 	function renderList(){
 		$('#dataContainer').empty();
-		//$('#list-wrapper').html('<table><tr><th>Key</th><th>Text</th></tr></table>');
 
 		//Count Objects
 		var transaction = db.transaction(['Notes'], 'readonly');
@@ -71,7 +51,6 @@
 		var noteCount;
 		var countRequest = store.count();
 		countRequest.onsuccess = function(e){
-			debugger;
 			noteCount = e.target.result;
 			$('.note-count').html('Count '+noteCount);
 			if(noteCount > 0){
@@ -85,11 +64,12 @@
 							+'data-subject="'+cursor.value.subject +'" '
 							+'data-author-name="'+cursor.value.authorName +'" '
 							+'data-message="'+cursor.value.message +'" '
-							+'data-created-date="'+cursor.value.creationTime +'" '
-							+'data-updated-date="'+cursor.value.updateTime +'" '
+							+'data-note-key="'+cursor.key +'" '
+							+'data-created-date="'+cursor.value.creationTime.toGMTString() +'" '
+							+'data-updated-date="'+cursor.value.updateTime.toGMTString() +'" '
 							+'data-toggle="modal" '
 							+'data-target="#moreInfoModal">More Info</a>');
-						$moreInfo.click(renderModal);
+						$moreInfo.click(renderMoreInfoModal);
 						var $deleteNoteLink = $('<a class="btn btn-default" href="#" '
 							+'data-note-key="'+cursor.key +'">Delete</a>');
 						$deleteNoteLink.click(deleteNote);
@@ -109,28 +89,59 @@
 
 	}
 
-	function renderModal(){
+	function renderMoreInfoModal(){
 		$('#moreInfoModal .modal-title').html($(this).data('subject'));
 		$('#moreInfoModal .subtitle').html('By -'+ $(this).data('authorName'));
-		$('#moreInfoModal .modal-body p').html($(this).data('message'))
+		$('#moreInfoModal .modal-body p').html($(this).data('message'));
+		$('#moreInfoModal .updated-date').html('Updated: '+$(this).data('updatedDate'));
+		$('#moreInfoModal .created-date').html('Created: '+ $(this).data('createdDate'));
+		$('.update-btn').attr("data-note-key",$(this).data('noteKey'));
+		$('.update-btn').click(loadNoteToUpdate);
 	}
 
-	function loadTextByKey(key){
-		var transaction = db.transaction(['wordliststore'], 'readonly');
-		var store = transaction.objectStore('wordliststore');
+	function updateNote() {
+		var transaction = db.transaction(["Notes"],"readwrite");
+		var store = transaction.objectStore("Notes");
+		var updateAuthname=document.getElementById("updateAuthname").value.trim();
+		var updateSubject=document.getElementById("updateSubject").value.trim();
+		var updateMessage=document.getElementById("updateMessage").value.trim();
+		var creationTime=document.getElementById("updateCreation").value.trim();
+		var noteKey=parseInt(document.getElementById("updateNoteKey").value.trim());
+		updateTime = new Date();
+
+		var noteToUpdate = store.get(noteKey);
+
+		noteToUpdate.onsuccess = function(event){
+			var data = noteToUpdate.result;
+			data.authorName = updateAuthname;
+			data.subject = updateSubject;
+			data.message = updateMessage;
+			data.updateTime = updateTime;
+			var updateNoteRequest = store.put(data, noteKey);
+			updateNoteRequest.onsuccess = function() {
+				$('#updateFormModal').modal('hide');
+				renderList();
+  			};
+		};
+	}
+
+	function loadNoteToUpdate(){
+		key = $(this).data('noteKey');
+		var transaction = db.transaction(['Notes'], 'readonly');
+		var store = transaction.objectStore('Notes');
 		var request = store.get(key);
 		request.onerror = function(event) {
-		  // Handle errors!
+		  console.log("Error",e.target.error.name);
 		};
 		request.onsuccess = function(event) {
-		  // Do something with the request.result!
-		  $('#detail').html('<h2>' + request.result.text + '</h2>');
-		  var $delBtn = $('<button>Delete me</button>');
-		  $delBtn.click(function(){
-		  	console.log('Delete ' + key);
-		  	deleteWord(key);
-		  });
-		  $('#detail').append($delBtn);
+			$('#moreInfoModal').modal('hide');
+			$('#updateFormModal').modal('show');
+			$('#updateAuthname').val(event.target.result.authorName);
+			$('#updateSubject').val(event.target.result.subject);
+			$('#updateMessage').val(event.target.result.message);
+			$('#updateCreation').val(event.target.result.creationTime);
+			$('#updateNoteKey').val(key);
+			$( "#updateForm" ).submit(updateNote);
 		};
 	}
 
@@ -143,10 +154,5 @@
 			renderList();
 		};
 	}
-
-
-
-
-
 
 })(jQuery);
