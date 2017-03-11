@@ -58,12 +58,13 @@
 					var cursor = event.target.result;
 					if (cursor) {
 						var $div = $('<div class="col-md-4">');
-						var $subject = $('<h2>'+cursor.value.subject+'</h2>');
+						var $subject = $('<h2>'+returnSafeString(cursor.value.subject)+'</h2>');
+						var $characterCount = $('<p>'+cursor.value.message.length +' character long</p>');
 						var $date = $('<p>'+cursor.value.updateTime.toGMTString() +'</p>');
 						var $moreInfo = $('<a class="btn btn-default" href="#" '
-							+'data-subject="'+cursor.value.subject +'" '
-							+'data-author-name="'+cursor.value.authorName +'" '
-							+'data-message="'+cursor.value.message +'" '
+							+'data-subject="'+returnSafeString(cursor.value.subject) +'" '
+							+'data-author-name="'+returnSafeString(cursor.value.authorName) +'" '
+							+'data-message="'+returnSafeString(cursor.value.message) +'" '
 							+'data-note-key="'+cursor.key +'" '
 							+'data-created-date="'+cursor.value.creationTime.toGMTString() +'" '
 							+'data-updated-date="'+cursor.value.updateTime.toGMTString() +'" '
@@ -75,6 +76,7 @@
 						$deleteNoteLink.click(deleteNote);
 
 						$div.append($subject);
+						$div.append($characterCount);
 						$div.append($date);
 						$div.append($moreInfo);
 						$div.append($deleteNoteLink);
@@ -89,10 +91,15 @@
 
 	}
 
+	function returnSafeString(unsafe_str){
+		return unsafe_str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	}
+	
+
 	function renderMoreInfoModal(){
-		$('#moreInfoModal .modal-title').html($(this).data('subject'));
-		$('#moreInfoModal .subtitle').html('By -'+ $(this).data('authorName'));
-		$('#moreInfoModal .modal-body p').html($(this).data('message'));
+		$('#moreInfoModal .modal-title').html(returnSafeString($(this).data('subject')));
+		$('#moreInfoModal .subtitle').html('By -'+ returnSafeString($(this).data('authorName')));
+		$('#moreInfoModal .modal-body p').html(returnSafeString($(this).data('message')));
 		$('#moreInfoModal .updated-date').html('Updated: '+$(this).data('updatedDate'));
 		$('#moreInfoModal .created-date').html('Created: '+ $(this).data('createdDate'));
 		$('.update-btn').attr("data-note-key",$(this).data('noteKey'));
